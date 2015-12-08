@@ -1,0 +1,181 @@
+#!/bin/bash
+CRITICAL=0
+WARNING=0
+PROC=0
+EXITCODE=0
+MEMWARN=0
+MEMCRIT=0
+SERV=0
+SERV_STAT=0;
+function Usage {
+        echo "
+        This script looks at a command and its processes and calculates its CPU and memory usage
+
+        OPTIONS:
+        -p - The process name to look for
+        -w - The warning to use for the CPU percentage used
+        -c - The critical to use for the CPU percentage used
+        -m - The warning to use for the Memory percentage used
+        -n - The critical to use for the Memory percentage used
+
+        EXAMPLES:
+                Check the usage for apache processes and alert warning if over 80% CPU utilised and critical if 90%
+                ./check_cpu_proc.sh -p apache2 -w 80 -c 90
+
+                Check the usage for nagios processes and alert warning if over 20% memory Utilised and critical if 30%
+                ./check_cpu_proc.sh -p nagios -m 20 -n 30
+"
+        exit 3
+}
+
+function ServiceFail {
+	
+	echo "CRITICAL $SERV CPU: 0% MEM: 0% over 0 processes | proc=0 mem=0% cpu=0% rss=0B vsz=0B socket=0 threads=0"
+
+	exit 2;
+}
+while getopts "p:w:c:m:n:" OPTION
+do
+        case $OPTION in
+                p)
+                        SERV=$OPTARG
+                  ;;
+
+                w)
+                        WARNING=$OPTARG
+                  ;;
+
+                c)
+                        CRITICAL=$OPTARG
+                  ;;
+
+                m)
+                        MEMWARN=$OPTARG
+                  ;;
+
+                n)
+                        MEMCRIT=$OPTARG
+                  ;;
+        esac
+done;
+
+systemctl is-active $SERV >/dev/null 2>&1
+SERV_STAT=$?;
+PROC="$(systemctl show $SERV --no-pager | grep ExecStart | awk '{ print $2 }' | rev | cut -d'/' -f 1 | rev)"
+if [ $SERV_STAT -ne 0 ]; then
+        ServiceFail;
+fi;
+
+if [[ $PROC == 0 ]]; then
+        echo "Must specify a process name"
+        Usage
+fi
+
+EXITCODE=0;
+PSOUTPUT=`ps aux | grep -v "grep" | grep $PROC`
+OIFS="${IFS}"
+NIFS=$'\n'
+
+IFS="${NIFS}"
+
+OVERALCPU=0.0
+OVERALMEM=0.0
+OVERALRSS=0.0
+OVERALVSZ=0.0
+COUNT=0
+COUNT_THREADS=0;
+COUNT_SOCKET=$(sudo /usr/bin/netstat -anp | grep $PROC | wc -l)
+for LINE in ${PSOUTPUT}; do
+        CPU=$(echo $LINE | awk '{ print $3 }')
+        COMMAND=$(echo $LINE | awk '{ print $11 }')
+        MEM=$(echo $LINE | awk '{ print $4 }')
+        RSS=$(echo $LINE | awk '{ print $6 }')
+        VSZ=$(echo $LINE | awk '{ print $5 }')
+	SPID=$(echo $LINE | awk '{print $2 }');
+	THREADS=$(awk '/^Threads/ { print $2 }' /proc/${SPID}/status 2>/dev/null);
+	if [ $? -eq 0 ]; then 
+		COUNT_THREADS=$(expr $COUNT_THREADS + $THREADS);
+	fi;
+        if [[ $COMMAND == *$PROC* ]]; then
+                OVERALCPU=`echo "${OVERALCPU} + ${CPU}" | bc -l`
+                OVERALMEM=`echo "${OVERALMEM} + ${MEM}" | bc -l`
+                OVERALRSS=`echo "${OVERALRSS} + ${RSS}" | bc -l`
+                OVERALVSZ=`echo "${OVERALVSZ} + ${VSZ}" | bc -l`
+                COUNT=`echo "${COUNT} + 1" | bc -l`
+                ACTCOMMAND=$COMMAND
+        fi
+
+done
+
+if [ $WARNING != 0 ] || [ $CRITICAL != 0 ]; then
+        if [ $WARNING == 0 ] || [ $CRITICAL == 0 ]; then
+                echo "Must Specify both warning and critical"
+                Usage
+        fi
+
+        #Work out CPU
+        if [ `echo $OVERALCPU'>'$WARNING | bc -l` == 1 ]; then
+                #echo $OVERALCPU'>'$WARNING
+                #echo $OVERALCPU'>'$WARNING | bc -l
+                EXITCODE=1
+
+                if [ `echo $OVERALCPU'>'$CRITICAL | bc -l` == 1 ]; then
+                        #echo $OVERALCPU'>'$CRITICAL
+                        #echo $OVERALCPU'>'$CRITICAL | bc -l
+                        EXITCODE=2
+                fi
+        fi
+fi
+
+if [ $MEMWARN != 0 ] || [ $MEMCRIT != 0 ]; then
+        if [ $MEMWARN == 0 ] || [ $MEMCRIT == 0 ]; then
+                echo "Must Specify both warning and critical"
+                Usage
+        fi
+
+        #Work out Memory
+        if [ `echo $OVERALMEM'>'$MEMWARN | bc -l` == 1 ]; then
+                #echo $OVERALCPU'>'$WARNING
+                #echo $OVERALCPU'>'$WARNING | bc -l
+                EXITCODE=1
+
+                if [ `echo $OVERALMEM'>'$MEMCRIT | bc -l` == 1 ]; then
+                        #echo $OVERALCPU'>'$CRITICAL
+                        #echo $OVERALCPU'>'$CRITICAL | bc -l
+                        EXITCODE=2
+                fi
+        fi
+fi
+
+EXITTEXT="OK"
+case "$EXITCODE" in
+        1)
+                EXITTEXT="WARNING"
+        ;;
+
+        2)
+                EXITTEXT="CRITICAL"
+        ;;
+
+        3)
+                EXITTEXT="UNKNOWN"
+        ;;
+esac
+
+
+IFS="${OIFS}"
+
+FIRST=${OVERALMEM:0:1};
+if [ "$FIRST" == "." ]; then
+	OVERALMEM="$(echo 0${OVERALMEM})";
+fi;
+
+FIRST=${OVERALCPU:0:1};
+if [ "$FIRST" == "." ]; then
+	OVERALCPU="$(echo 0${OVERALCPU})";
+fi;
+OVERALVSZ="$(echo $OVERALVSZ \* 1000.0 | bc )";
+OVERALRSS="$(echo $OVERALRSS \* 1000.0 | bc )";
+echo "${EXITTEXT} ${ACTCOMMAND} SOCKET: ${COUNT_SOCKET} CPU: ${OVERALCPU}% MEM: ${OVERALMEM}% over ${COUNT} processes | proc=${COUNT} mem=${OVERALMEM}% cpu=${OVERALCPU}% rss=${OVERALRSS}B vsz=${OVERALVSZ}B socket=${COUNT_SOCKET} threads=${COUNT_THREADS}"
+
+exit $EXITCODE
