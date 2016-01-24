@@ -1,4 +1,8 @@
 #!/bin/bash
+# npre plugin to monitor processes and their utilization of system resources
+# Created by Thomas Weaver on January 18, 2014 8:31 pm
+# mobilesvenvd@gmail.com
+# Download: http://www.toms-blog.com/nagios-check-process-cpu-memory/
 CRITICAL=0
 WARNING=0
 PROC=0
