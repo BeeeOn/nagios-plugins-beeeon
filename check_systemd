@@ -84,7 +84,7 @@ OVERALRSS=0.0
 OVERALVSZ=0.0
 COUNT=0
 COUNT_THREADS=0;
-COUNT_SOCKET=$(sudo /usr/bin/netstat -anp | grep $PROC | wc -l)
+COUNT_SOCKET=$(sudo netstat -anp | grep $PROC | wc -l)
 for LINE in ${PSOUTPUT}; do
         CPU=$(echo $LINE | awk '{ print $3 }')
         COMMAND=$(echo $LINE | awk '{ print $11 }')
