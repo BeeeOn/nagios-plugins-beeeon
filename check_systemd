@@ -11,6 +11,7 @@ MEMWARN=0
 MEMCRIT=0
 SERV=0
 SERV_STAT=0;
+UPTIME=0;
 function Usage {
         echo "
         This script looks at a command and its processes and calculates its CPU and memory usage
@@ -34,7 +35,7 @@ function Usage {
 
 function ServiceFail {
 	
-	echo "CRITICAL $SERV CPU: 0% MEM: 0% over 0 processes | proc=0 mem=0% cpu=0% rss=0B vsz=0B socket=0 threads=0"
+	echo "CRITICAL $SERV CPU: 0% MEM: 0% over 0 processes | proc=0 mem=0% cpu=0% rss=0B vsz=0B socket=0 threads=0 uptime=0s"
 
 	exit 2;
 }
@@ -69,6 +70,11 @@ PROC="$(systemctl show $SERV --no-pager | grep ExecStart | awk '{ print $2 }' | 
 if [ $SERV_STAT -ne 0 ]; then
         ServiceFail;
 fi;
+
+date="$(systemctl show $SERV --no-pager | grep ExecMainStartTimestamp= | cut -d'=' -f 2)";
+start_date=$(date -d"$date" +%s);
+actual_date="$(date +%s)";
+UPTIME="$(expr $actual_date - $start_date)";
 
 if [[ $PROC == 0 ]]; then
         echo "Must specify a process name"
@@ -180,6 +186,6 @@ if [ "$FIRST" == "." ]; then
 fi;
 OVERALVSZ="$(echo $OVERALVSZ \* 1000.0 | bc )";
 OVERALRSS="$(echo $OVERALRSS \* 1000.0 | bc )";
-echo "${EXITTEXT} ${ACTCOMMAND} SOCKET: ${COUNT_SOCKET} CPU: ${OVERALCPU}% MEM: ${OVERALMEM}% over ${COUNT} processes | proc=${COUNT} mem=${OVERALMEM}% cpu=${OVERALCPU}% rss=${OVERALRSS}B vsz=${OVERALVSZ}B socket=${COUNT_SOCKET} threads=${COUNT_THREADS}"
+echo "${EXITTEXT} ${ACTCOMMAND} SOCKET: ${COUNT_SOCKET} UPTIME: ${UPTIME}s CPU: ${OVERALCPU}% MEM: ${OVERALMEM}% over ${COUNT} processes | proc=${COUNT} mem=${OVERALMEM}% cpu=${OVERALCPU}% rss=${OVERALRSS}B vsz=${OVERALVSZ}B socket=${COUNT_SOCKET} threads=${COUNT_THREADS} uptime=${UPTIME}s"
 
 exit $EXITCODE
