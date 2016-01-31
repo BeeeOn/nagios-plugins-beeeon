@@ -66,12 +66,12 @@ done;
 
 systemctl is-active $SERV >/dev/null 2>&1
 SERV_STAT=$?;
-PROC="$(systemctl show $SERV --no-pager | grep ExecStart | awk '{ print $2 }' | rev | cut -d'/' -f 1 | rev)"
+PROC="$(systemctl show $SERV -p ExecStart --no-pager | awk '{ print $2 }' | rev | cut -d'/' -f 1 | rev)"
 if [ $SERV_STAT -ne 0 ]; then
         ServiceFail;
 fi;
 
-date="$(systemctl show $SERV --no-pager | grep ExecMainStartTimestamp= | cut -d'=' -f 2)";
+date="$(systemctl show $SERV -p ExecMainStartTimestamp --no-pager | cut -d'=' -f 2)";
 start_date=$(date -d"$date" +%s);
 actual_date="$(date +%s)";
 UPTIME="$(expr $actual_date - $start_date)";
