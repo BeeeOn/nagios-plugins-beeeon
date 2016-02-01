@@ -11,7 +11,8 @@ MEMWARN=0
 MEMCRIT=0
 SERV=0
 SERV_STAT=0;
-UPTIME=0;
+UPTIME_DAYS=0;
+export LC_ALL=C;
 function Usage {
         echo "
         This script looks at a command and its processes and calculates its CPU and memory usage
@@ -35,7 +36,7 @@ function Usage {
 
 function ServiceFail {
 	
-	echo "CRITICAL $SERV CPU: 0% MEM: 0% over 0 processes | proc=0 mem=0% cpu=0% rss=0B vsz=0B socket=0 threads=0 uptime=0s"
+	echo "CRITICAL $SERV UPTIME: 0 days CPU: 0% MEM: 0% over 0 processes | proc=0 mem=0% cpu=0% rss=0B vsz=0B socket=0 threads=0 uptime=0"
 
 	exit 2;
 }
@@ -71,10 +72,12 @@ if [ $SERV_STAT -ne 0 ]; then
         ServiceFail;
 fi;
 
-date="$(systemctl show $SERV -p ExecMainStartTimestamp --no-pager | cut -d'=' -f 2)";
-start_date=$(date -d"$date" +%s);
-actual_date="$(date +%s)";
-UPTIME="$(expr $actual_date - $start_date)";
+UPTIME_HUMAN="$(systemctl status $SERV --no-pager | grep 'Active:' | cut -d';' -f2 | cut -c 2- )";
+DATE_START_SERV_SEC="$(systemctl show $SERV -p ExecMainStartTimestamp --no-pager | cut -d'=' -f 2)";
+DATE_START_SERV_SEC=$(date -d"$DATE_START_SERV_SEC" +%s);
+DATE_CURRENT_SEC="$(date +%s)";
+UPTIME_DAYS="$(expr $DATE_CURRENT_SEC - $DATE_START_SERV_SEC)";
+UPTIME_DAYS=$(echo "scale=2;${UPTIME_DAYS}/86400" | bc);
 
 if [[ $PROC == 0 ]]; then
         echo "Must specify a process name"
@@ -186,6 +189,6 @@ if [ "$FIRST" == "." ]; then
 fi;
 OVERALVSZ="$(echo $OVERALVSZ \* 1000.0 | bc )";
 OVERALRSS="$(echo $OVERALRSS \* 1000.0 | bc )";
-echo "${EXITTEXT} ${ACTCOMMAND} SOCKET: ${COUNT_SOCKET} UPTIME: ${UPTIME}s CPU: ${OVERALCPU}% MEM: ${OVERALMEM}% over ${COUNT} processes | proc=${COUNT} mem=${OVERALMEM}% cpu=${OVERALCPU}% rss=${OVERALRSS}B vsz=${OVERALVSZ}B socket=${COUNT_SOCKET} threads=${COUNT_THREADS} uptime=${UPTIME}s"
+echo "${EXITTEXT} ${ACTCOMMAND} SOCKET: ${COUNT_SOCKET} UPTIME: ${UPTIME_HUMAN} CPU: ${OVERALCPU}% MEM: ${OVERALMEM}% over ${COUNT} processes | proc=${COUNT} mem=${OVERALMEM}% cpu=${OVERALCPU}% rss=${OVERALRSS}B vsz=${OVERALVSZ}B socket=${COUNT_SOCKET} threads=${COUNT_THREADS} uptime=${UPTIME_DAYS}"
 
 exit $EXITCODE
