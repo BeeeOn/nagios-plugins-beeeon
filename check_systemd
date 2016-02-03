@@ -44,7 +44,7 @@ while getopts "p:w:c:m:n:" OPTION
 do
         case $OPTION in
                 p)
-                        SERV=$OPTARG
+                        SERV="$(echo "$OPTARG" | grep -E -o '[A-Za-z0-9_\.\-]{1,}' | sed -n 1p)";
                   ;;
 
                 w)
