@@ -73,7 +73,7 @@ if [ $SERV_STAT -ne 0 ]; then
 fi;
 
 UPTIME_HUMAN="$(systemctl status $SERV --no-pager | grep 'Active:' | cut -d';' -f2 | cut -c 2- )";
-DATE_START_SERV_SEC="$(systemctl show $SERV -p ExecMainStartTimestamp --no-pager | cut -d'=' -f 2)";
+DATE_START_SERV_SEC="$(systemctl show $SERV -p ExecMainStartTimestamp --no-pager | grep -E -o '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}')";
 DATE_START_SERV_SEC=$(date -d"$DATE_START_SERV_SEC" +%s);
 DATE_CURRENT_SEC="$(date +%s)";
 UPTIME_DAYS="$(expr $DATE_CURRENT_SEC - $DATE_START_SERV_SEC)";
