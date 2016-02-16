@@ -15,10 +15,10 @@ UPTIME_DAYS=0;
 export LC_ALL=C;
 function Usage {
         echo "
-        This script looks at a command and its processes and calculates its CPU and memory usage
+        This script looks at a systemd service and shows several statistics (cpu usage, memory usage, ...)
 
         OPTIONS:
-        -p - The process name to look for
+        -p - The systemd service to look for
         -w - The warning to use for the CPU percentage used
         -c - The critical to use for the CPU percentage used
         -m - The warning to use for the Memory percentage used
@@ -26,10 +26,10 @@ function Usage {
 
         EXAMPLES:
                 Check the usage for apache processes and alert warning if over 80% CPU utilised and critical if 90%
-                ./check_cpu_proc.sh -p apache2 -w 80 -c 90
+                ./check_systemd -p apache2 -w 80 -c 90
 
                 Check the usage for nagios processes and alert warning if over 20% memory Utilised and critical if 30%
-                ./check_cpu_proc.sh -p nagios -m 20 -n 30
+                ./check_systemd -p nagios -m 20 -n 30
 "
         exit 3
 }
@@ -65,6 +65,11 @@ do
         esac
 done;
 
+if [ "$SERV" = "0" ] ; then
+        echo "Systemd service must be specified"
+        Usage
+fi
+
 systemctl is-active $SERV >/dev/null 2>&1
 SERV_STAT=$?;
 PROC="$(systemctl show $SERV -p ExecStart --no-pager | awk '{ print $2 }' | rev | cut -d'/' -f 1 | rev)"
@@ -78,11 +83,6 @@ DATE_START_SERV_SEC=$(date -d"$DATE_START_SERV_SEC" +%s);
 DATE_CURRENT_SEC="$(date +%s)";
 UPTIME_DAYS="$(expr $DATE_CURRENT_SEC - $DATE_START_SERV_SEC)";
 UPTIME_DAYS=$(echo "scale=2;${UPTIME_DAYS}/86400" | bc);
-
-if [[ $PROC == 0 ]]; then
-        echo "Must specify a process name"
-        Usage
-fi
 
 EXITCODE=0;
 PSOUTPUT=`ps aux | grep -v "grep" | grep $PROC`
