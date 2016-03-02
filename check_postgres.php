@@ -1,6 +1,8 @@
 #!/usr/bin/php
 
-#SPDX-License-Identifier:        BSD-3-Clause
+# Simple plugin to gather long term statistics about BeeeOn database.
+# Authors: Lukas Koszegy, Pavel Vampola; 2015
+# SPDX-License-Identifier:        BSD-3-Clause
 
 <?php
 	$arg = getopt("h:d:p:u:W:");
