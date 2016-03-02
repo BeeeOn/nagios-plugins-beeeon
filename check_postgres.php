@@ -1,4 +1,7 @@
 #!/usr/bin/php
+
+#SPDX-License-Identifier:        BSD-3-Clause
+
 <?php
 	$arg = getopt("h:d:p:u:W:");
 	$db_ada = pg_connect("host=".$arg['h']." dbname=".$arg['d']." user=".$arg['u']." password=".$arg['W']." port=".$arg['p']." connect_timeout=5");
