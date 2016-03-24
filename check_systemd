@@ -73,6 +73,7 @@ fi
 systemctl is-active $SERV >/dev/null 2>&1
 SERV_STAT=$?;
 PROC="$(systemctl show $SERV -p ExecStart --no-pager | awk '{ print $2 }' | rev | cut -d'/' -f 1 | rev)"
+PID=($(systemctl show $SERV -p MainPID --no-pager | cut -d'=' -f 2));
 if [ $SERV_STAT -ne 0 ]; then
         ServiceFail;
 fi;
@@ -85,7 +86,6 @@ UPTIME_DAYS="$(expr $DATE_CURRENT_SEC - $DATE_START_SERV_SEC)";
 UPTIME_DAYS=$(echo "scale=2;${UPTIME_DAYS}/86400" | bc);
 
 EXITCODE=0;
-PSOUTPUT=`ps aux | grep -v "grep" | grep $PROC`
 OIFS="${IFS}"
 NIFS=$'\n'
 
@@ -98,25 +98,30 @@ OVERALVSZ=0.0
 COUNT=0
 COUNT_THREADS=0;
 COUNT_SOCKET=$(sudo netstat -anp | grep $PROC | wc -l)
-for LINE in ${PSOUTPUT}; do
+i=0;
+pid=${PID[$i]};
+while [[ $pid != "" ]]; do
+    PID+=($(pgrep -P ${pid}));
+    i=$(expr $i + 1);
+    pid=${PID[$i]};
+done;
+for pid in ${PID[@]}; do
+        LINE="$(ps aux | grep -v "grep" | grep $pid)";
         CPU=$(echo $LINE | awk '{ print $3 }')
         COMMAND=$(echo $LINE | awk '{ print $11 }')
         MEM=$(echo $LINE | awk '{ print $4 }')
         RSS=$(echo $LINE | awk '{ print $6 }')
         VSZ=$(echo $LINE | awk '{ print $5 }')
-	SPID=$(echo $LINE | awk '{print $2 }');
-	THREADS=$(awk '/^Threads/ { print $2 }' /proc/${SPID}/status 2>/dev/null);
-	if [ $? -eq 0 ]; then 
-		COUNT_THREADS=$(expr $COUNT_THREADS + $THREADS);
-	fi;
-        if [[ $COMMAND == *$PROC* ]]; then
-                OVERALCPU=`echo "${OVERALCPU} + ${CPU}" | bc -l`
-                OVERALMEM=`echo "${OVERALMEM} + ${MEM}" | bc -l`
-                OVERALRSS=`echo "${OVERALRSS} + ${RSS}" | bc -l`
-                OVERALVSZ=`echo "${OVERALVSZ} + ${VSZ}" | bc -l`
-                COUNT=`echo "${COUNT} + 1" | bc -l`
-                ACTCOMMAND=$COMMAND
-        fi
+        THREADS=$(awk '/^Threads/ { print $2 }' /proc/${pid}/status 2>/dev/null);
+        if [ $? -eq 0 ]; then
+            COUNT_THREADS=$(expr $COUNT_THREADS + $THREADS);
+        fi;
+        OVERALCPU=`echo "${OVERALCPU} + ${CPU}" | bc -l`
+        OVERALMEM=`echo "${OVERALMEM} + ${MEM}" | bc -l`
+        OVERALRSS=`echo "${OVERALRSS} + ${RSS}" | bc -l`
+        OVERALVSZ=`echo "${OVERALVSZ} + ${VSZ}" | bc -l`
+        COUNT=`echo "${COUNT} + 1" | bc -l`
+        ACTCOMMAND=$COMMAND;
 
 done
 
